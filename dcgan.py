@@ -3,9 +3,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import tensorflow
 import math
 import os
-import sys
 import argparse
-import uuid
+import json
 import numpy as np
 
 from PIL import Image
@@ -20,19 +19,21 @@ from tensorflow.keras.preprocessing.image import img_to_array, load_img
 
 g_opt = Adam(lr=2e-4, beta_1=0.5)
 d_opt = Adam(lr=1e-5, beta_1=0.1)
-z_dim= 100
-num_images= 16
-num_epoch= 20
-batch_size= 32
 
-def load_data(path, max):
+script_dir= os.path.abspath(os.path.dirname(__file__))
+config_path= os.path.join(script_dir, 'config.json')
+config= json.load(open(config_path))
+
+def load_data(path):
 
     # file
     #
-    filenames= os.listdir(path)
+    files= os.listdir(path)
     x_train= []
-    for i in range(min(max, len(filenames))):
-        img= img_to_array(Image.open(path+filenames[i]))
+    # num_files= 100;
+    num_files= len(files);
+    for i in range(num_files):
+        img= img_to_array(Image.open(path+files[i]))
         img= (img.astype(np.float32) - 127.5)/127.5
         x_train.append(img)
     x_train= np.array(x_train)
@@ -56,6 +57,7 @@ def generator_model(image_shape):
     data_format = 'channels_last'
     width= int(image_shape[0]/4)
     height= int(image_shape[1]/4)
+    z_dim= config['z_dim']
     model = Sequential()
 
     model.add(Dense(
@@ -142,9 +144,16 @@ def combine_images(generated_images):
 
     return Image.fromarray(output_image.astype(np.uint8))
 
-def train(batch_size, num_epoch, src_path, src_max, dst_path, num_images):
+def train(src_dir, dst_dir):
 
-    x_train= load_data(src_path, src_max)
+    z_dim= config['z_dim']
+    num_epoch= config['num_epoch']
+    batch_size= config['batch_size']
+    num_images= config['num_images']
+    save_image_epoch= config['save_image_epoch']
+    save_weights_epoch= config['save_weights_epoch']
+
+    x_train= load_data(src_dir)
     src_shape= x_train[0].shape
 
     noise_fix= np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
@@ -181,58 +190,43 @@ def train(batch_size, num_epoch, src_path, src_max, dst_path, num_images):
             g_loss = dcgan.train_on_batch(noise, [1]*batch_size)
             print("epoch: %d, batch: %d, g_loss: %f, d_loss: %f" % (epoch, index, g_loss, d_loss))
 
-        # 生成画像を出力
-        fix_images = generator.predict(noise_fix, verbose=0)
-        noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
-        var_images = generator.predict(noise, verbose=0)
+        if epoch%save_image_epoch==0:
 
-        combined_image= combine_images(np.concatenate([fix_images, var_images]))
-        if not os.path.exists(dst_path):
-            os.mkdir(dst_path)
-        combined_image.save(dst_path+"%04d.png" % (epoch))
+            # 生成画像を出力
+            fix_images = generator.predict(noise_fix, verbose=0)
+            noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
+            var_images = generator.predict(noise, verbose=0)
 
-        generator.save_weights('generator.h5')
-        discriminator.save_weights('discriminator.h5')
+            combined_image= combine_images(np.concatenate([fix_images, var_images]))
+            if not os.path.exists(dst_dir):
+                os.mkdir(dst_dir)
+            combined_image.save(os.path.join(dst_dir, '%04d.png'%(epoch)))
 
-def generate(batch_size, nice, dst_path):
+        if epoch%save_weights_epoch==0:
+
+            generator.save_weights(os.path.join(dst_dir, '_generator-%04d.h5'%(epoch)))
+            # discriminator.save_weights('discriminator.h5')
+
+def generate(batch_size, nice, dst_dir):
     return
 
-def get_args():
-    parser= argparse.ArgumentParser()
-    # parser.add_argument('--mode', type=str)
-    parser.add_argument('--epoch', type=int, default=num_epoch)
-    parser.add_argument('--batch-size', type=int, default=batch_size)
-    # parser.add_argument('--nice', action='store_true')
-    parser.add_argument('--src-path', type=str, default='')
-    parser.add_argument('--src-max', type=int, default=sys.maxsize)
-    parser.add_argument('--dst-path', type=str, default='dst/'+str(uuid.uuid4())+'/')
-    parser.add_argument('--images', type=int, default=num_images)
-    args= parser.parse_args()
-    return args
-
 if __name__=='__main__':
-    args= get_args()
+
+    parser= argparse.ArgumentParser()
+    parser.add_argument('--mode', type=str, default='')
+    parser.add_argument('--src-dir', type=str, default='')
+    parser.add_argument('--dst-dir', type=str, default='')
+    args= parser.parse_args()
 
     train(
-        batch_size= args.batch_size,
-        num_epoch= args.epoch,
-        src_path= args.src_path,
-        src_max= args.src_max,
-        dst_path= args.dst_path,
-        num_images= args.images
+        src_dir= args.src_dir,
+        dst_dir= args.dst_dir,
     )
 
     # if args.mode=='train':
-    #     train(
-    #         batch_size= args.batch_size,
-    #         num_epoch= args.epoch,
-    #         src_path= args.src_path,
-    #         src_max= args.src_max,
-    #         dst_path= args.dst_path
-    #     )
     # elif args.mode=='generate':
     #     generate(
     #         batch_size=args.batch_size,
     #         nice=args.nice,
-    #         dst_path=args.dst_path
+    #         dst_dir=args.dst_dir
     #     )
