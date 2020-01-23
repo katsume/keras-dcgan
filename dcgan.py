@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import tensorflow
 import math
 import os
@@ -11,18 +9,15 @@ from PIL import Image
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense, Reshape, Activation
 from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import UpSampling2D, Conv2D
+from tensorflow.keras.layers import UpSampling2D, Conv2D, Conv2DTranspose
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import Flatten, Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import img_to_array, load_img
 
-g_opt = Adam(lr=2e-4, beta_1=0.5)
-d_opt = Adam(lr=1e-5, beta_1=0.1)
-
-script_dir= os.path.abspath(os.path.dirname(__file__))
-config_path= os.path.join(script_dir, 'config.json')
-config= json.load(open(config_path))
+z_dim= 100
+g_opt= Adam(lr=2e-4, beta_1=0.5)
+d_opt= Adam(lr=1e-5, beta_1=0.1)
 
 def load_data(path):
 
@@ -57,7 +52,6 @@ def generator_model(image_shape):
     data_format = 'channels_last'
     width= int(image_shape[0]/4)
     height= int(image_shape[1]/4)
-    z_dim= config['z_dim']
     model = Sequential()
 
     model.add(Dense(
@@ -144,16 +138,13 @@ def combine_images(generated_images):
 
     return Image.fromarray(output_image.astype(np.uint8))
 
-def train(src_dir, dst_dir):
+def train():
 
-    z_dim= config['z_dim']
-    num_epoch= config['num_epoch']
-    batch_size= config['batch_size']
-    num_images= config['num_images']
-    save_image_epoch= config['save_image_epoch']
-    save_weights_epoch= config['save_weights_epoch']
+    dst_dir= args.dst_dir
+    batch_size= args.batch_size
+    num_images= args.num_images
 
-    x_train= load_data(src_dir)
+    x_train= load_data(args.src_dir)
     src_shape= x_train[0].shape
 
     noise_fix= np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
@@ -172,7 +163,7 @@ def train(src_dir, dst_dir):
 
     num_batches = int(x_train.shape[0] / batch_size)
     print('Number of batches:', num_batches)
-    for epoch in range(num_epoch):
+    for epoch in range(args.epoch):
 
         for index in range(num_batches):
 
@@ -182,51 +173,54 @@ def train(src_dir, dst_dir):
 
             # discriminatorを更新
             X = np.concatenate((image_batch, generated_images))
-            y = [1]*batch_size + [0]*batch_size
+            # y = [1]*batch_size+[0]*batch_size
+            y = np.concatenate((np.random.rand(batch_size)*0.5+0.7, np.random.rand(batch_size)*0.5-0.2))
             d_loss = discriminator.train_on_batch(X, y)
 
             # generatorを更新
             noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(batch_size)])
-            g_loss = dcgan.train_on_batch(noise, [1]*batch_size)
+            # g_loss = dcgan.train_on_batch(noise, [1]*batch_size)
+            g_loss = dcgan.train_on_batch(noise, np.random.rand(batch_size)*0.5+0.7)
             print("epoch: %d, batch: %d, g_loss: %f, d_loss: %f" % (epoch, index, g_loss, d_loss))
 
-        if epoch%save_image_epoch==0:
+        if epoch%args.save_image_step==0:
 
             # 生成画像を出力
             fix_images = generator.predict(noise_fix, verbose=0)
             noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
             var_images = generator.predict(noise, verbose=0)
 
-            combined_image= combine_images(np.concatenate([fix_images, var_images]))
+            # combined_image= combine_images(np.concatenate([fix_images, var_images]))
+            combined_fix_image= combine_images(fix_images)
+            combined_var_image= combine_images(var_images)
             if not os.path.exists(dst_dir):
                 os.mkdir(dst_dir)
-            combined_image.save(os.path.join(dst_dir, '%04d.png'%(epoch)))
+            # combined_image.save(os.path.join(dst_dir, '%04d.png'%(epoch)))
+            combined_fix_image.save(os.path.join(dst_dir, 'f%04d.png'%(epoch)))
+            combined_var_image.save(os.path.join(dst_dir, 'v%04d.png'%(epoch)))
 
-        if epoch%save_weights_epoch==0:
+        if epoch%args.save_weights_step==0:
 
             generator.save_weights(os.path.join(dst_dir, '_generator-%04d.h5'%(epoch)))
             # discriminator.save_weights('discriminator.h5')
 
-def generate(batch_size, nice, dst_dir):
+def generate():
     return
 
 if __name__=='__main__':
 
     parser= argparse.ArgumentParser()
-    parser.add_argument('--mode', type=str, default='')
+    parser.add_argument('mode', type=str, default='')
     parser.add_argument('--src-dir', type=str, default='')
     parser.add_argument('--dst-dir', type=str, default='')
+    parser.add_argument('--epoch', type=int, default=1000)
+    parser.add_argument('--batch-size', type=int, default=32)
+    parser.add_argument('--save-image-step', type=int, default=10)
+    parser.add_argument('--save-weights-step', type=int, default=100)
+    parser.add_argument('--num-images', type=int, default=36)
     args= parser.parse_args()
 
-    train(
-        src_dir= args.src_dir,
-        dst_dir= args.dst_dir,
-    )
-
-    # if args.mode=='train':
-    # elif args.mode=='generate':
-    #     generate(
-    #         batch_size=args.batch_size,
-    #         nice=args.nice,
-    #         dst_dir=args.dst_dir
-    #     )
+    if args.mode=='train':
+        train()
+    elif args.mode=='generate':
+        generate()
