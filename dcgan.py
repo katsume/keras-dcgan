@@ -2,7 +2,6 @@ import tensorflow
 import math
 import os
 import argparse
-import json
 import numpy as np
 
 from PIL import Image
@@ -17,7 +16,8 @@ from tensorflow.keras.preprocessing.image import img_to_array, load_img
 
 z_dim= 100
 g_opt= Adam(lr=2e-4, beta_1=0.5)
-d_opt= Adam(lr=1e-5, beta_1=0.1)
+d_opt= Adam(lr=2e-4, beta_1=0.5)
+# d_opt= Adam(lr=1e-5, beta_1=0.1)
 
 def load_data(path):
 
@@ -49,9 +49,9 @@ def load_data(path):
     return x_train
 
 def generator_model(image_shape):
-    data_format = 'channels_last'
     width= int(image_shape[0]/4)
     height= int(image_shape[1]/4)
+    ch= image_shape[2]
     model = Sequential()
 
     model.add(Dense(
@@ -66,34 +66,30 @@ def generator_model(image_shape):
     model.add(Activation('relu'))
 
     model.add(Reshape((width, height, 128), input_shape=(128*width*height,)))
-    model.add(UpSampling2D((2, 2), data_format=data_format))
+    model.add(UpSampling2D((2, 2)))
     model.add(Conv2D(
         64, (5, 5),
         padding='same',
-        data_format=data_format,
         kernel_initializer='he_normal'))
     model.add(BatchNormalization())
     model.add(Activation('relu'))
 
-    model.add(UpSampling2D((2, 2), data_format=data_format))
+    model.add(UpSampling2D((2, 2)))
     model.add(Conv2D(
-        image_shape[2], (5, 5),
+        ch, (5, 5),
         padding='same',
-        data_format=data_format,
         kernel_initializer='he_normal'))
     model.add(Activation('tanh'))
 
     return model
 
 def discriminator_model(image_shape):
-    data_format = 'channels_last'
     model = Sequential()
 
     model.add(Conv2D(
         64, (5, 5),
         strides=(2, 2),
         padding='same',
-        data_format=data_format,
         input_shape=image_shape,
         kernel_initializer='he_normal'))
     model.add(LeakyReLU(0.2))
@@ -101,7 +97,6 @@ def discriminator_model(image_shape):
     model.add(Conv2D(
         128, (5, 5),
         strides=(2, 2),
-        data_format=data_format,
         kernel_initializer='he_normal'))
     model.add(LeakyReLU(0.2))
 
@@ -173,14 +168,12 @@ def train():
 
             # discriminatorを更新
             X = np.concatenate((image_batch, generated_images))
-            # y = [1]*batch_size+[0]*batch_size
-            y = np.concatenate((np.random.rand(batch_size)*0.5+0.7, np.random.rand(batch_size)*0.5-0.2))
+            y = [1]*batch_size+[0]*batch_size
             d_loss = discriminator.train_on_batch(X, y)
 
             # generatorを更新
             noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(batch_size)])
-            # g_loss = dcgan.train_on_batch(noise, [1]*batch_size)
-            g_loss = dcgan.train_on_batch(noise, np.random.rand(batch_size)*0.5+0.7)
+            g_loss = dcgan.train_on_batch(noise, [1]*batch_size)
             print("epoch: %d, batch: %d, g_loss: %f, d_loss: %f" % (epoch, index, g_loss, d_loss))
 
         if epoch%args.save_image_step==0:
@@ -190,14 +183,10 @@ def train():
             noise = np.array([np.random.uniform(-1, 1, z_dim) for _ in range(int(num_images/2))])
             var_images = generator.predict(noise, verbose=0)
 
-            # combined_image= combine_images(np.concatenate([fix_images, var_images]))
-            combined_fix_image= combine_images(fix_images)
-            combined_var_image= combine_images(var_images)
+            combined_image= combine_images(np.concatenate([fix_images, var_images]))
             if not os.path.exists(dst_dir):
                 os.mkdir(dst_dir)
-            # combined_image.save(os.path.join(dst_dir, '%04d.png'%(epoch)))
-            combined_fix_image.save(os.path.join(dst_dir, 'f%04d.png'%(epoch)))
-            combined_var_image.save(os.path.join(dst_dir, 'v%04d.png'%(epoch)))
+            combined_image.save(os.path.join(dst_dir, '%04d.png'%(epoch)))
 
         if epoch%args.save_weights_step==0:
 
