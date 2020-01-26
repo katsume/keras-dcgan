@@ -2,6 +2,11 @@
 
 Fork of [jacobgil/keras-dcgan](https://github.com/jacobgil/keras-dcgan)
 
+## Environment
+
+- [Tensorflow](https://www.tensorflow.org/) r2.1
+- Pillow
+
 ---
 
 ## Usage
@@ -23,7 +28,7 @@ python3 dcgan.py train <args...>
 ### Resize image
 
 ```
-(IMAGES_DIR)$ python (PATH)/utils/resize-images.py <DST_DIR> [--width WIDTH] [--height HEIGHT]
+$ python utils/resize-images.py <SRC_DIR> <DST_DIR> [--width WIDTH] [--height HEIGHT]
 ```
 
 ### Flip image (Horizontal)
@@ -35,7 +40,7 @@ python3 dcgan.py train <args...>
 ### Sync folers
 
 ```
-$ python (PATH)/utils/sync-dir.py <SOURCE_DIR> <TARGET_DIR>
+$ python utils/sync-dir.py <BASE_DIR> <TARGET_DIR>
 ```
 
 - Files in the target dir will be removed if no file name matched in the source dir.

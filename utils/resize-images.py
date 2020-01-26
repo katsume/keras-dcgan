@@ -7,6 +7,7 @@ from PIL import Image
 if __name__=='__main__':
 
     parser= argparse.ArgumentParser()
+    parser.add_argument('src', type=str)
     parser.add_argument('dst', type=str)
     parser.add_argument('--width', type=int, default=128)
     parser.add_argument('--height', type=int, default=128)
@@ -15,7 +16,7 @@ if __name__=='__main__':
     if not os.path.exists(args.dst):
         os.mkdir(args.dst)
 
-    files= glob.glob(os.path.join(os.getcwd(), '*'));
+    files= glob.glob(os.path.join(args.src, '*'));
     for file in files:
 
         dir, name= os.path.split(file)
