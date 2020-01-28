@@ -5,6 +5,7 @@ Fork of [jacobgil/keras-dcgan](https://github.com/jacobgil/keras-dcgan)
 ## Environment
 
 - [Tensorflow](https://www.tensorflow.org/) r2.1
+
 - Pillow
 
 ---
@@ -23,33 +24,7 @@ python3 dcgan.py train <args...>
 
 ---
 
-## Utilities
-
-### Resize image
-
-```
-$ python utils/resize-images.py <SRC_DIR> <DST_DIR> [--width WIDTH] [--height HEIGHT]
-```
-
-### Flip image (Horizontal)
-
-```
-(IMAGES_DIR)$ python (PATH)/utils/flip-images.py
-```
-
-### Sync folers
-
-```
-$ python utils/sync-dir.py <BASE_DIR> <TARGET_DIR>
-```
-
-- Files in the target dir will be removed if no file name matched in the source dir.
-
----
-
 ## Reference
-
-[jacobgil/keras-dcgan](https://github.com/jacobgil/keras-dcgan)
 
 [はじめてのGAN](https://elix-tech.github.io/ja/2017/02/06/gan.html)
 
